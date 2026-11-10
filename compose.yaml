@@ -1,0 +1,39 @@
+# FeedMind local development services.
+#
+# Currently PostgreSQL only. Credentials are read from the root `.env` file
+# (Compose loads it automatically for variable interpolation); nothing secret is
+# stored here. POSTGRES_* must match the credentials in DATABASE_URL.
+#
+#   docker compose up -d db      # start
+#   docker compose ps            # check health
+#   docker compose stop db       # stop, keeping data
+#   docker compose down          # remove container, keeping the named volume
+
+name: feedmind
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      # Bound to loopback only, so the dev database is not exposed to the network.
+      # Both IPv4 and IPv6 loopback are bound: `localhost` resolves to ::1 first
+      # on Windows, and an unbound ::1 stalls connections until a TCP timeout.
+      - "127.0.0.1:5432:5432"
+      - "[::1]:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # $$ defers expansion to the container's own environment.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_data:
